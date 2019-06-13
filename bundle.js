@@ -43,13 +43,41 @@ function createGraph(mainAsset) {
     asset.deps.forEach((relativePath) => {
       const dirname = path.dirname(asset.filename);
       const absolutePath = path.join(dirname, relativePath);
-      const child = createAsset(absolutePath);
 
-      asset.mapping = {
-        [relativePath]: child.id
-      };
+      if (/\.css$/.test(relativePath)) {
+        const content = fs.readFileSync(absolutePath, "utf-8");
+        const code = `
+          const style = document.createElement("style");
+          style.setAttribute("type", "text/css");
+          style.innerText = ${JSON.stringify(content).replace(/\\n/g, "")}
+          document.head.appendChild(style);
+        `;
 
-      queue.push(child);
+        const id = ID++;
+
+        const child = {
+          id: id,
+          filename: absolutePath,
+          code,
+          deps: [],
+        };
+
+        asset.mapping = {
+          [relativePath]: child.id
+        };
+
+        queue.push(child);
+
+      } else {
+        const child = createAsset(absolutePath);
+
+        asset.mapping = {
+          ...asset.mapping,
+          [relativePath]: child.id
+        };
+
+        queue.push(child);
+      }
     })
   }
   return queue;
@@ -93,7 +121,6 @@ function bundle(graph) {
 
 const mainAsset = createAsset("./examples/entry.js");
 const graph = createGraph(mainAsset);
-
 const result = bundle(graph);
 console.log(result);
 
